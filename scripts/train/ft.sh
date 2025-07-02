@@ -3,8 +3,8 @@ SHELL_FOLDER=$(cd "$(dirname "$0")";pwd)
 cd $(dirname $SHELL_FOLDER)
 cd ../
 
-source "$(dirname $(which conda))/../etc/profile.d/conda.sh"
-conda activate py3.11+pytorch2.6+cu124
+# source "$(dirname $(which conda))/../etc/profile.d/conda.sh"
+# conda activate py3.11+pytorch2.6+cu124
 
 debug=false
 RANK=0
