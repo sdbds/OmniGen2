@@ -153,6 +153,22 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable group offload."
     )
+    parser.add_argument(
+        "--enable_teacache",
+        action="store_true",
+        help="Enable teacache to speed up inference."
+    )
+    parser.add_argument(
+        "--teacache_rel_l1_thresh",
+        type=float,
+        default=0.05,
+        help="Relative L1 threshold for teacache."
+    )
+    parser.add_argument(
+        "--enable_taylorseer",
+        action="store_true",
+        help="Enable TaylorSeer Caching."
+    )
     return parser.parse_args()
 
 def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dtype: torch.dtype) -> OmniGen2Pipeline:
@@ -161,6 +177,7 @@ def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dty
         torch_dtype=weight_dtype,
         trust_remote_code=True,
     )
+
     if args.transformer_path:
         print(f"Transformer weights loaded from {args.transformer_path}")
         pipeline.transformer = OmniGen2Transformer2DModel.from_pretrained(
@@ -177,6 +194,15 @@ def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dty
     if args.transformer_lora_path:
         print(f"LoRA weights loaded from {args.transformer_lora_path}")
         pipeline.load_lora_weights(args.transformer_lora_path)
+
+    if args.enable_teacache and args.enable_taylorseer:
+        print("WARNING: enable_teacache and enable_taylorseer are mutually exclusive. enable_teacache will be ignored.")
+
+    if args.enable_taylorseer:
+        pipeline.enable_taylorseer = True
+    elif args.enable_teacache:
+        pipeline.transformer.enable_teacache = True
+        pipeline.transformer.teacache_rel_l1_thresh = args.teacache_rel_l1_thresh
 
     if args.scheduler == "dpmsolver++":
         from omnigen2.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
@@ -198,6 +224,7 @@ def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dty
         apply_group_offloading(pipeline.vae, onload_device=accelerator.device, offload_type="block_level", num_blocks_per_group=2, use_stream=True)
     else:
         pipeline = pipeline.to(accelerator.device)
+
     return pipeline
 
 def preprocess(input_image_path: List[str] = []) -> Tuple[str, str, List[Image.Image]]:

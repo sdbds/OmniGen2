@@ -46,7 +46,11 @@ import PIL.Image
 from diffusers.utils import BaseOutput
 
 from omnigen2.pipelines.image_processor import OmniGen2ImageProcessor
+
+from omnigen2.utils.teacache_util import TeaCacheParams
+
 from ..lora_pipeline import OmniGen2LoraLoaderMixin
+
 
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
@@ -55,6 +59,7 @@ if is_torch_xla_available():
 else:
     XLA_AVAILABLE = False
 
+from ...cache_functions import cache_init 
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -631,9 +636,28 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
         )
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
         self._num_timesteps = len(timesteps)
-        
+
+        enable_taylorseer = getattr(self, "enable_taylorseer", False)
+        if enable_taylorseer:
+            model_pred_cache_dic, model_pred_current = cache_init(self, num_inference_steps)
+            model_pred_ref_cache_dic, model_pred_ref_current = cache_init(self, num_inference_steps)
+            model_pred_uncond_cache_dic, model_pred_uncond_current = cache_init(self, num_inference_steps)
+            self.transformer.enable_taylorseer = True
+        elif self.transformer.enable_teacache:
+            # Use different TeaCacheParams for different conditions
+            teacache_params = TeaCacheParams()
+            teacache_params_uncond = TeaCacheParams()
+            teacache_params_ref = TeaCacheParams()
+
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
+                if enable_taylorseer:
+                    self.transformer.cache_dic = model_pred_cache_dic
+                    self.transformer.current = model_pred_current
+                elif self.transformer.enable_teacache:
+                    teacache_params.is_first_or_last_step = i == 0 or i == len(timesteps) - 1
+                    self.transformer.teacache_params = teacache_params
+
                 model_pred = self.predict(
                     t=t,
                     latents=latents,
@@ -646,6 +670,13 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                 image_guidance_scale = self.image_guidance_scale if self.cfg_range[0] <= i / len(timesteps) <= self.cfg_range[1] else 1.0
                 
                 if text_guidance_scale > 1.0 and image_guidance_scale > 1.0:
+                    if enable_taylorseer:
+                        self.transformer.cache_dic = model_pred_ref_cache_dic
+                        self.transformer.current = model_pred_ref_current
+                    elif self.transformer.enable_teacache:
+                        teacache_params_ref.is_first_or_last_step = i == 0 or i == len(timesteps) - 1
+                        self.transformer.teacache_params = teacache_params_ref
+
                     model_pred_ref = self.predict(
                         t=t,
                         latents=latents,
@@ -655,21 +686,32 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                         ref_image_hidden_states=ref_latents,
                     )
 
-                    if image_guidance_scale != 1:
-                        model_pred_uncond = self.predict(
-                            t=t,
-                            latents=latents,
-                            prompt_embeds=negative_prompt_embeds,
-                            freqs_cis=freqs_cis,
-                            prompt_attention_mask=negative_prompt_attention_mask,
-                            ref_image_hidden_states=None,
-                        )
-                    else:
-                        model_pred_uncond = torch.zeros_like(model_pred)
+                    if enable_taylorseer:
+                        self.transformer.cache_dic = model_pred_uncond_cache_dic
+                        self.transformer.current = model_pred_uncond_current
+                    elif self.transformer.enable_teacache:
+                        teacache_params_uncond.is_first_or_last_step = i == 0 or i == len(timesteps) - 1
+                        self.transformer.teacache_params = teacache_params_uncond
+
+                    model_pred_uncond = self.predict(
+                        t=t,
+                        latents=latents,
+                        prompt_embeds=negative_prompt_embeds,
+                        freqs_cis=freqs_cis,
+                        prompt_attention_mask=negative_prompt_attention_mask,
+                        ref_image_hidden_states=None,
+                    )
 
                     model_pred = model_pred_uncond + image_guidance_scale * (model_pred_ref - model_pred_uncond) + \
-                    text_guidance_scale * (model_pred - model_pred_ref)
+                        text_guidance_scale * (model_pred - model_pred_ref)
                 elif text_guidance_scale > 1.0:
+                    if enable_taylorseer:
+                        self.transformer.cache_dic = model_pred_uncond_cache_dic
+                        self.transformer.current = model_pred_uncond_current
+                    elif self.transformer.enable_teacache:
+                        teacache_params_uncond.is_first_or_last_step = i == 0 or i == len(timesteps) - 1
+                        self.transformer.teacache_params = teacache_params_uncond
+
                     model_pred_uncond = self.predict(
                         t=t,
                         latents=latents,
@@ -689,6 +731,10 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                 
                 if step_func is not None:
                     step_func(i, self._num_timesteps)
+
+        if enable_taylorseer:
+            del model_pred_cache_dic, model_pred_ref_cache_dic, model_pred_uncond_cache_dic
+            del model_pred_current, model_pred_ref_current, model_pred_uncond_current
 
         latents = latents.to(dtype=dtype)
         if self.vae.config.scaling_factor is not None:
