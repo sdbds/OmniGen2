@@ -9,7 +9,7 @@
   <a href="https://huggingface.co/spaces/OmniGen2/OmniGen2"><img src="https://img.shields.io/badge/HF%20Spaces-🤗-lightblue" alt="demo"></a>
   <a href="https://huggingface.co/OmniGen2/OmniGen2"><img src="https://img.shields.io/badge/Model-🤗-yellow" alt="model"></a>
   <a href="https://huggingface.co/datasets/OmniGen2/OmniContext"><img src="https://img.shields.io/badge/Benchmark-🤗-yellow" alt="model"></a>
-  <a href=""><img src="https://img.shields.io/badge/Dataset-🤗-yellow" alt="model"></a>
+  <a href="https://huggingface.co/datasets/OmniGen2/X2I2"><img src="https://img.shields.io/badge/Dataset-🤗-yellow" alt="model"></a>
 </p>
 
 <h4 align="center">
@@ -24,8 +24,11 @@
 </h4>
 
 ## 🔥 News
+- **2025-07-05**: Training datasets [X2I2](https://huggingface.co/datasets/OmniGen2/X2I2) are available.
+- **2025-07-03**: OmniGen2 now supports [TeaCache](https://github.com/ali-vilab/TeaCache) and [TaylorSeer](https://github.com/Shenyi-Z/TaylorSeer) for faster inference, see [Usage Tips](#-usage-tips) for details. Thanks @legitnull for great [TeaCache-PR](https://github.com/VectorSpaceLab/OmniGen2/pull/52) and [TaylorSeer-PR](https://github.com/VectorSpaceLab/OmniGen2/pull/76).
+- **2025-07-01**: OmniGen2 is supported by [ComfyUI official](https://comfyanonymous.github.io/ComfyUI_examples/omnigen), thanks !!
 - **2025-06-30**: Training code is available, see [fine-tuning](docs/FINETUNE.md) for details.
-- **2025-06-28**: We release [OmniContext](https://huggingface.co/datasets/OmniGen2/OmniContext) benchmark. The evaluation code can be found in [omnicontext](https://github.com/VectorSpaceLab/OmniGen2/tree/main/omnicontext).
+- **2025-06-28**: We release [OmniContext](https://huggingface.co/datasets/OmniGen2/OmniContext) benchmark. The evaluation codes are in [omnicontext](https://github.com/VectorSpaceLab/OmniGen2/tree/main/omnicontext).
 - **2025-06-24**: [Technical Report](https://arxiv.org/abs/2506.18871) is available.
 - **2025-06-23**: We’ve updated our code and HF model—OmniGen2 now runs *without* `flash-attn`. Users can still install it for optimal performance.
 - **2025-06-20**: Updated [resource requirements](#-resources-requirement), adding CPU offload support for devices with limited VRAM.
@@ -69,7 +72,7 @@ Some good cases of OmniGen2:
 - [x] Support CPU offload and improve inference efficiency.
 - [x] In-context generation benchmark: **OmniContext**.
 - [ ] Integration of diffusers.
-- [ ] Training datasets.
+- [x] Training datasets.
 - [ ] Training data construction pipeline.
 - [ ] ComfyUI Demo (**commuity support will be greatly appreciated!**).
 
@@ -180,6 +183,9 @@ To achieve optimal results with OmniGen2, you can adjust the following key hyper
 - `cfg_range_start`, `cfg_range_end`: Define the timestep range where CFG is applied. Per this [paper](https://arxiv.org/abs/2404.07724), reducing `cfg_range_end` can significantly decrease inference time with a negligible impact on quality.
 - `scheduler`: Choose between `[euler, dpmsolver++]`. Default is `euler`. For potentially better performance with fewer steps, try `dpmsolver++`.
 - `num_inference_step`: Number of discretization steps for the ODE solver. Default is `50`.
+- `enable_teacache`: Whether or not enable [teacache](https://github.com/ali-vilab/TeaCache) for faster inference.
+- `teacache_rel_l1_thresh`: The threshold for accumulated L1 distance for the timestep embedding-modulated noisy input. It serves as an indicator of whether to cache the model output. You can modify the `teacache_rel_l1_thresh` parameter to achieve your desired trade-off between latency and visual quality. The default value of 0.05 provides approximately a **30% speedup** compared to the baseline. Increasing this value can further reduce latency, but may result in some loss of detail.
+- `enable_taylorseer`: Whether or not enable [taylorseer](https://github.com/Shenyi-Z/TaylorSeer) for faster inference. When enabled, inference speed can improve by up to **2X**, with negligible quality loss compared to the baseline.
 
 **Some suggestions for improving generation quality:**
 1. Use High-Quality Images
