@@ -1,9 +1,249 @@
 data:
   - 
-    path: "data_configs/train/example/t2i/jsonls/0.jsonl"
+    path: "data_configs/train/example/t2i/jsonls/1.jsonl"
     type: "t2i"
     ratio: !!float 1
-  # - 
-  #   path: "data_configs/example/t2i/jsonls/1.jsonl"
-  #   type: "t2i"
-  #   ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/2.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/3.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/4.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/5.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/6.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/7.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/8.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/9.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/10.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/11.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/12.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/13.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/14.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/15.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/16.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/17.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/18.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/19.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/20.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/21.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/22.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/23.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/24.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/25.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/26.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/27.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/28.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/29.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/30.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/31.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/32.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/33.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/34.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/35.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/36.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/37.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/38.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/39.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/40.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/41.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/42.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/43.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/44.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/45.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/46.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/47.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/48.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/49.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/50.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/51.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/52.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/53.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/54.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/55.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/56.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/57.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/58.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/59.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/60.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/61.jsonl"
+    type: "t2i"
+    ratio: !!float 1
+  - 
+    path: "data_configs/train/example/t2i/jsonls/62.jsonl"
+    type: "t2i"
+    ratio: !!float 1
