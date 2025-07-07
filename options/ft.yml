@@ -8,7 +8,7 @@ data:
   data_path: data_configs/train/example/mix.yml
   use_chat_template: true
   maximum_text_tokens: 888
-  prompt_dropout_prob: !!float 0.0001
+  prompt_dropout_prob: !!float 0
   ref_img_dropout_prob: !!float 0.5
   max_output_pixels: 1048576 # 1024 * 1024
   max_input_pixels: [1048576, 1048576, 589824, 262144] # [1024 * 1024, 1024 * 1024, 768 * 768, 512 * 512]
@@ -63,7 +63,7 @@ train:
   use_8bit_adam: false
   adam_beta1: 0.9
   adam_beta2: 0.95
-  adam_weight_decay: !!float 0.01
+  adam_weight_decay: !!float 0
   adam_epsilon: !!float 1e-08
   max_grad_norm: 1
 
@@ -72,7 +72,7 @@ train:
   set_grads_to_none: true
 
   # Misc
-  allow_tf32: false
+  allow_tf32: true
   mixed_precision: 'bf16'
 
   ema_decay: 0.0

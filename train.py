@@ -360,6 +360,8 @@ def main(args):
         batch_size=args.train.batch_size,
         num_workers=args.train.dataloader_num_workers,
         worker_init_fn=worker_init_fn,
+        pin_memory=True,
+        persistent_workers=True,
         drop_last=True,
         collate_fn=OmniGen2Collator(tokenizer=text_tokenizer, max_token_len=args.data.maximum_text_tokens)
     )
