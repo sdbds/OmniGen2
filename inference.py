@@ -169,6 +169,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable TaylorSeer Caching."
     )
+
+    parser.add_argument(
+        "--guidance_method",
+        type=str,
+        default="ICG",
+        choices=["ICG", "CFG"],
+        help="Guidance method to use for the model. ICG: Independent Condition Guidance, CFG: Classifier-Free Guidance."
+        
+    )
+
+
     return parser.parse_args()
 
 def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dtype: torch.dtype) -> OmniGen2Pipeline:
@@ -270,6 +281,7 @@ def run(args: argparse.Namespace,
         num_images_per_prompt=args.num_images_per_prompt,
         generator=generator,
         output_type="pil",
+        guidance_method=args.guidance_method,
     )
     return results
 

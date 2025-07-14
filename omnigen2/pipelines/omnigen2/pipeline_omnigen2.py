@@ -18,7 +18,7 @@ limitations under the License.
 
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
+import time
 import math
 
 from PIL import Image
@@ -490,6 +490,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
         generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
         latents: Optional[torch.FloatTensor] = None,
         output_type: Optional[str] = "pil",
+        guidance_method: str = "ICG",
         return_dict: bool = True,
         verbose: bool = False,
         step_func=None,
@@ -594,7 +595,9 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
             device=device,
             dtype=dtype,
             verbose=verbose,
+            guidance_method=guidance_method,
             step_func=step_func,
+            
         )
 
         image = F.interpolate(image, size=(ori_height, ori_width), mode='bilinear')
@@ -623,7 +626,9 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
         device,
         dtype,
         verbose,
+        guidance_method,
         step_func=None
+        
     ):
         batch_size = latents.shape[0]
 
@@ -648,9 +653,12 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
             teacache_params = TeaCacheParams()
             teacache_params_uncond = TeaCacheParams()
             teacache_params_ref = TeaCacheParams()
-
+        
         with self.progress_bar(total=num_inference_steps) as progress_bar:
+            
+            
             for i, t in enumerate(timesteps):
+                
                 if enable_taylorseer:
                     self.transformer.cache_dic = model_pred_cache_dic
                     self.transformer.current = model_pred_current
@@ -670,6 +678,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                 image_guidance_scale = self.image_guidance_scale if self.cfg_range[0] <= i / len(timesteps) <= self.cfg_range[1] else 1.0
                 
                 if text_guidance_scale > 1.0 and image_guidance_scale > 1.0:
+                    
                     if enable_taylorseer:
                         self.transformer.cache_dic = model_pred_ref_cache_dic
                         self.transformer.current = model_pred_ref_current
@@ -692,18 +701,30 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                     elif self.transformer.enable_teacache:
                         teacache_params_uncond.is_first_or_last_step = i == 0 or i == len(timesteps) - 1
                         self.transformer.teacache_params = teacache_params_uncond
-
-                    model_pred_uncond = self.predict(
-                        t=t,
-                        latents=latents,
-                        prompt_embeds=negative_prompt_embeds,
-                        freqs_cis=freqs_cis,
-                        prompt_attention_mask=negative_prompt_attention_mask,
-                        ref_image_hidden_states=None,
-                    )
-
-                    model_pred = model_pred_uncond + image_guidance_scale * (model_pred_ref - model_pred_uncond) + \
-                        text_guidance_scale * (model_pred - model_pred_ref)
+                    
+                    if guidance_method == "CFG":
+                        
+                        model_pred_uncond = self.predict(
+                            t=t,
+                            latents=latents,
+                            prompt_embeds=negative_prompt_embeds,
+                            freqs_cis=freqs_cis,
+                            prompt_attention_mask=negative_prompt_attention_mask,
+                            ref_image_hidden_states=None,
+                        )
+                        
+                    
+                        model_pred = model_pred_uncond + image_guidance_scale * (model_pred_ref - model_pred_uncond) + \
+                            text_guidance_scale * (model_pred - model_pred_ref)
+                        
+                    elif guidance_method == "ICG":
+                        snr = (i + 1e-5) / (self._num_timesteps - i + 1e-5)
+                        icg_text_scale = text_guidance_scale * snr / (1 + snr)
+                        model_pred = model_pred_ref + icg_text_scale * (model_pred - model_pred_ref)
+                
+                    end_for = time.time()
+                    
+                
                 elif text_guidance_scale > 1.0:
                     if enable_taylorseer:
                         self.transformer.cache_dic = model_pred_uncond_cache_dic

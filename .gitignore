@@ -10,7 +10,9 @@
 # Icon must end with two \r
 Icon
 
-
+#pretrained weights
+pretrained_models/
+venv
 # Thumbnails
 ._*
 

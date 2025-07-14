@@ -16,4 +16,5 @@ python-dotenv
 ninja
 ipykernel
 wheel
+gradio
 triton-windows; sys_platform == "win32"
