@@ -289,9 +289,11 @@ def main(args):
             )
 
         optimizer_class = bnb.optim.AdamW8bit
+    elif args.train.bf16_fused_adam:
+        from bf16_fused_adam import BF16FusedAdamW
+        optimizer_class = BF16FusedAdamW
     else:
-        from adamw_bf16 import AdamWBF16
-        optimizer_class = AdamWBF16
+        optimizer_class = torch.optim.AdamW
 
     log_model_info("transformer", model)
 
