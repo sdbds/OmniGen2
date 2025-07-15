@@ -65,6 +65,9 @@ def run(
     max_input_image_side_length,
     max_pixels,
     seed_input,
+    use_teacache,
+    teacache_scale,
+    guidance_method:str,
     progress=gr.Progress(),
 ):
     input_images = [image_input_1, image_input_2, image_input_3]
@@ -92,6 +95,23 @@ def run(
             prediction_type="flow_prediction",
         )
 
+    if  use_teacache:
+        print("Using teacache for inference speedup")
+        pipeline.transformer.enable_teacache = True
+        pipeline.transformer.teacache_rel_l1_thresh = teacache_scale
+    
+    else:
+        pipeline.transformer.enable_teacache = False
+    print(guidance_method)
+    
+    if guidance_method == "True":
+        print("Using ICG guidance method")
+        guidance_method = "ICG"
+    else :
+        print("Using CFG guidance method")
+        guidance_method = "CFG"
+
+
     results = pipeline(
         prompt=instruction,
         input_images=input_images,
@@ -108,6 +128,7 @@ def run(
         num_images_per_prompt=num_images_per_prompt,
         generator=generator,
         output_type="pil",
+        guidance_method=guidance_method,
         step_func=progress_callback,
     )
 
@@ -881,6 +902,10 @@ def run_for_examples(
     max_input_image_side_length,
     max_pixels,
     seed_input,
+    use_teacache,
+    teacache_scale,
+    guidance_method:str,
+    progress=gr.Progress(),
 ):
     return run(
         instruction,
@@ -900,6 +925,10 @@ def run_for_examples(
         max_input_image_side_length,
         max_pixels,
         seed_input,
+        use_teacache,
+        teacache_scale,
+        guidance_method,
+        progress=gr.Progress(),
     )
 
 description = """
@@ -964,6 +993,22 @@ def main(args):
                     width_input = gr.Slider(
                         label="Width", minimum=256, maximum=2048, value=1024, step=128
                     )
+                with gr.Row(equal_height=True):
+                    guidance_method = gr.Dropdown(
+                        label="use_icg", choices=["True", "False"], 
+                        value = "True",
+                        info="ICG inference time optimization.",
+                    )
+                with gr.Row(equal_height=True):
+                    use_teacache = gr.Dropdown(
+                        label="Teacache usage", choices=[True, False], 
+                        value=True,
+                        info="Teacache inference time optimization.",
+                    )
+                    teacache_scale = gr.Slider(
+                        label="Teacache Scale", minimum=0, maximum=1, value=0.1, step=0.01,
+                    )
+                
                 with gr.Row(equal_height=True):
                     text_guidance_scale_input = gr.Slider(
                         label="Text Guidance Scale",
@@ -1091,6 +1136,10 @@ def main(args):
                 max_input_image_side_length,
                 max_pixels,
                 seed_input,
+                use_teacache,
+                teacache_scale,
+                guidance_method,
+                
             ],
             outputs=output_image,
         )
@@ -1116,6 +1165,10 @@ def main(args):
                 max_input_image_side_length,
                 max_pixels,
                 seed_input,
+                use_teacache,
+                teacache_scale,
+                guidance_method,
+               
             ],
             outputs=output_image,
         )
@@ -1133,7 +1186,7 @@ def parse_args():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="OmniGen2/OmniGen2",
+        default="./pretrained_models",
         help="Path or HuggingFace name of the model to load."
     )
     parser.add_argument(
