@@ -21,3 +21,4 @@ flash-attn
 peft
 torchdiffeq
 datasets
+bf16_fused_adam
