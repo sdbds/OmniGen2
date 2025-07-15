@@ -17,7 +17,6 @@ from diffusers.hooks import apply_group_offloading
 from omnigen2.pipelines.omnigen2.pipeline_omnigen2 import OmniGen2Pipeline
 from omnigen2.models.transformers.transformer_omnigen2 import OmniGen2Transformer2DModel
 
-
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="OmniGen2 image generation script.")
@@ -169,6 +168,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable TaylorSeer Caching."
     )
+    parser.add_argument(
+        "--enable_magcache",
+        action="store_true",
+        help="Enable magcache to speed up inference."
+    )
+    parser.add_argument(
+        "--magcache_thresh",
+        type=float,
+        default=0.05,
+        help="Relative L1 threshold for magcache."
+    )
     return parser.parse_args()
 
 def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dtype: torch.dtype) -> OmniGen2Pipeline:
@@ -203,7 +213,10 @@ def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dty
     elif args.enable_teacache:
         pipeline.transformer.enable_teacache = True
         pipeline.transformer.teacache_rel_l1_thresh = args.teacache_rel_l1_thresh
-
+    elif args.enable_magcache:
+        from omnigen2.magcache import set_magcache_params
+        set_magcache_params(pipeline, args)
+        
     if args.scheduler == "dpmsolver++":
         from omnigen2.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
         scheduler = DPMSolverMultistepScheduler(
