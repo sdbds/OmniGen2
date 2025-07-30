@@ -17,7 +17,8 @@ ninja
 ipykernel
 wheel
 triton-windows; sys_platform == "win32"
-flash-attn
+flash-attn; sys_platform == 'linux'
+https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.0.post2/flash_attn-2.8.0.post2+cu128torch2.7.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl; sys_platform == 'win32'
 peft
 torchdiffeq
 datasets
