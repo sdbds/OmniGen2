@@ -403,8 +403,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         self.precentage = 1
         
         # SortBlock state tracking
-        self.current_block_residual = None
-        self.previous_block_residual = None
+        self.current_block_residual = {}
+        self.previous_block_residual = {}
         self.result_list = []
 
     def initialize_weights(self) -> None:
@@ -465,18 +465,15 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 
                 # Store residuals for comparison
                 if self.count % current_step_num == 0:
-                    if self.previous_block_residual[layer_idx] is None:
-                        self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
-                    else:
-                        self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
+                    self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
             else:
                 # Use Taylor approximation for skipped blocks
                 if self.count % current_step_num == 1:
-                    if self.current_block_residual[layer_idx] is None:
+                    if layer_idx not in self.current_block_residual:
                         self.current_block_residual[layer_idx] = torch.zeros_like(hidden_states)
                 
                 # Apply stored residual
-                if layer_idx < len(self.current_block_residual) and self.current_block_residual[layer_idx] is not None:
+                if layer_idx in self.current_block_residual:
                     hidden_states += self.current_block_residual[layer_idx]
 
         # Compute cosine similarities and update result_list
