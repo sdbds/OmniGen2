@@ -706,6 +706,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 if timestep == 1000:
                     self.current_block_residual = {}
                     self.previous_block_residual = {}
+                    self.previous_block_residual = {}
                     self.count = 0
                     self.precentage = 1
                     self.result_list = []
@@ -769,19 +770,14 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                         
                         # Use cached Taylor approximation for comparison
                         curr_residual = self.current_block_residual[i]
-
-                        # Safeguard: check for dimension mismatch before computing similarity
-                        if prev_residual.shape == curr_residual.shape:
-                            prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 16].float()
-                            curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 16].float()
-                            
-                            cosine_similarity = torch.nn.functional.cosine_similarity(
-                                prev_subset, curr_subset, dim=-1
-                            )
-                            cosine_similarities.append(cosine_similarity.mean().item())
-                        else:
-                            # Shape mismatch, cannot compute similarity. Default to high similarity to force re-computation.
-                            cosine_similarities.append(1.0)
+                        
+                        prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 16].float()
+                        curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 16].float()
+                        
+                        cosine_similarity = torch.nn.functional.cosine_similarity(
+                            prev_subset, curr_subset, dim=-1
+                        )
+                        cosine_similarities.append(cosine_similarity.mean().item())
                     else:
                         cosine_similarities.append(1.0)  # Default high similarity
                 
