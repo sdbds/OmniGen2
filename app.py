@@ -100,8 +100,10 @@ def run(
     if enable_sortblock:
         print("WARNING: enable_taylorseer and enable_sortblock are mutually exclusive. enable_sortblock will be used.")
         pipeline.enable_sortblock = True
+        pipeline.transformer.enable_sortblock = True
     elif enable_taylorseer:
         pipeline.enable_taylorseer = True
+        pipeline.transformer.enable_taylorseer = True
     elif enable_magcache:
         pipeline.transformer.enable_magcache = True
         pipeline.transformer.magcache_thresh = magcache_thresh
