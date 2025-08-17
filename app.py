@@ -1092,11 +1092,12 @@ def main(args):
         global accelerator
         global pipeline
 
-        bf16 = True
-        accelerator = Accelerator(mixed_precision="bf16" if bf16 else "no")
-        weight_dtype = torch.bfloat16 if bf16 else torch.float32
-
-        pipeline = load_pipeline(accelerator, weight_dtype, args)
+        # Only initialize pipeline if not already loaded
+        if pipeline is None:
+            bf16 = True
+            accelerator = Accelerator(mixed_precision="bf16" if bf16 else "no")
+            weight_dtype = torch.bfloat16 if bf16 else torch.float32
+            pipeline = load_pipeline(accelerator, weight_dtype, args)
 
         # click
         generate_button.click(
