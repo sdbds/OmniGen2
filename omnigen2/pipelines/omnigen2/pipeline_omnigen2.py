@@ -638,7 +638,8 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
         self._num_timesteps = len(timesteps)
 
         enable_taylorseer = getattr(self, "enable_taylorseer", False)
-        if enable_taylorseer:
+        enable_sortblock = getattr(self, "enable_sortblock", False)
+        if enable_taylorseer or enable_sortblock:
             model_pred_cache_dic, model_pred_current = cache_init(self, num_inference_steps)
             model_pred_ref_cache_dic, model_pred_ref_current = cache_init(self, num_inference_steps)
             model_pred_uncond_cache_dic, model_pred_uncond_current = cache_init(self, num_inference_steps)
@@ -651,7 +652,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
 
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                if enable_taylorseer:
+                if enable_taylorseer or enable_sortblock:
                     self.transformer.cache_dic = model_pred_cache_dic
                     self.transformer.current = model_pred_current
                 elif self.transformer.enable_teacache:
@@ -670,7 +671,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                 image_guidance_scale = self.image_guidance_scale if self.cfg_range[0] <= i / len(timesteps) <= self.cfg_range[1] else 1.0
                 
                 if text_guidance_scale > 1.0 and image_guidance_scale > 1.0:
-                    if enable_taylorseer:
+                    if enable_taylorseer or enable_sortblock:
                         self.transformer.cache_dic = model_pred_ref_cache_dic
                         self.transformer.current = model_pred_ref_current
                     elif self.transformer.enable_teacache:
@@ -686,7 +687,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                         ref_image_hidden_states=ref_latents,
                     )
 
-                    if enable_taylorseer:
+                    if enable_taylorseer or enable_sortblock:
                         self.transformer.cache_dic = model_pred_uncond_cache_dic
                         self.transformer.current = model_pred_uncond_current
                     elif self.transformer.enable_teacache:
@@ -705,7 +706,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                     model_pred = model_pred_uncond + image_guidance_scale * (model_pred_ref - model_pred_uncond) + \
                         text_guidance_scale * (model_pred - model_pred_ref)
                 elif text_guidance_scale > 1.0:
-                    if enable_taylorseer:
+                    if enable_taylorseer or enable_sortblock:
                         self.transformer.cache_dic = model_pred_uncond_cache_dic
                         self.transformer.current = model_pred_uncond_current
                     elif self.transformer.enable_teacache:
@@ -732,7 +733,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
                 if step_func is not None:
                     step_func(i, self._num_timesteps)
 
-        if enable_taylorseer:
+        if enable_taylorseer or enable_sortblock:
             del model_pred_cache_dic, model_pred_ref_cache_dic, model_pred_uncond_cache_dic
             del model_pred_current, model_pred_ref_current, model_pred_uncond_current
 

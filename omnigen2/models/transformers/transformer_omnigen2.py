@@ -392,6 +392,20 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         coefficients = [-5.48259225, 11.48772289, -4.47407401, 2.47730926, -0.03316487]
         self.rescale_func = np.poly1d(coefficients)
 
+        # SortBlock settings (enable_sortblock will be set from pipeline)
+        self.start = 950  # timestep range start
+        self.end = 50     # timestep range end
+        self.step_Num = 1
+        self.step_Num2 = 5
+        self.beta = 0.1    # rescale factor
+        self.count = 0
+        self.precentage = 1
+        
+        # SortBlock state tracking
+        self.current_block_residual = None
+        self.previous_block_residual = None
+        self.result_list = []
+
     def initialize_weights(self) -> None:
         """
         Initialize the weights of the model.
@@ -410,6 +424,96 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         nn.init.zeros_(self.norm_out.linear_2.bias)
         
         nn.init.normal_(self.image_index_embedding, std=0.02)
+
+    def _sortblock_forward(self, hidden_states, attention_mask, rotary_emb, temb, timestep):
+        """
+        SortBlock forward implementation based on TaylorSeer dynamic block selection.
+        """
+        # Initialize state on first timestep
+        if timestep == 1000:
+            self.current_block_residual = [None] * len(self.layers)
+            self.previous_block_residual = [None] * len(self.layers)
+            self.count = 0
+            self.precentage = 1
+            self.result_list = []
+
+        self.count += 1
+
+        # Determine if we're within the block range
+        is_within_block_range = self.end <= timestep <= self.start
+        if is_within_block_range:
+            current_step_num = self.step_Num2
+        else:
+            current_step_num = self.step_Num
+
+        # Process each layer
+        for layer_idx, layer in enumerate(self.layers):
+            should_compute_block = self.count % current_step_num == 0 or (
+                self.result_list != [] and layer_idx < len(self.result_list) and self.result_list[layer_idx] == 1
+            )
+            
+            if should_compute_block:
+                ori_hidden_states = hidden_states.clone()
+                
+                if torch.is_grad_enabled() and self.gradient_checkpointing:
+                    hidden_states = self._gradient_checkpointing_func(
+                        layer, hidden_states, attention_mask, rotary_emb, temb
+                    )
+                else:
+                    hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
+                
+                # Store residuals for comparison
+                if self.count % current_step_num == 0:
+                    if self.previous_block_residual[layer_idx] is None:
+                        self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
+                    else:
+                        self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
+            else:
+                # Use Taylor approximation for skipped blocks
+                if self.count % current_step_num == 1:
+                    if self.current_block_residual[layer_idx] is None:
+                        self.current_block_residual[layer_idx] = torch.zeros_like(hidden_states)
+                
+                # Apply stored residual
+                if layer_idx < len(self.current_block_residual) and self.current_block_residual[layer_idx] is not None:
+                    hidden_states += self.current_block_residual[layer_idx]
+
+        # Compute cosine similarities and update result_list
+        if self.count % current_step_num == 1 and len(self.previous_block_residual) > 0:
+            # Rescale factor based on timestep
+            coefficients = [5.67621e-14, -1.36659e-10, 1.16246e-7, -3.97725e-5, 0.00361, 0.56088]
+            rescale_func = np.poly1d(coefficients)
+            self.precentage = rescale_func(timestep.item()) * self.beta
+            
+            cosine_similarities = []
+            for i in range(len(self.layers)):
+                if (self.previous_block_residual[i] is not None and 
+                    self.current_block_residual[i] is not None):
+                    # Compute cosine similarity on a subset of features for efficiency
+                    prev_subset = self.previous_block_residual[i][:, :, :self.previous_block_residual[i].shape[-1] // 8].float()
+                    curr_subset = self.current_block_residual[i][:, :, :self.current_block_residual[i].shape[-1] // 8].float()
+                    
+                    cosine_similarity = torch.nn.functional.cosine_similarity(
+                        prev_subset, curr_subset, dim=-1
+                    )
+                    cosine_similarities.append(cosine_similarity.mean().item())
+                else:
+                    cosine_similarities.append(1.0)  # Default high similarity
+            
+            # Sort and determine threshold
+            sorted_cos = sorted(cosine_similarities)
+            threshold_idx = int(len(self.layers) * self.precentage)
+            threshold = sorted_cos[min(threshold_idx, len(sorted_cos) - 1)]
+            
+            # Update result list
+            self.result_list = []
+            for similarity in cosine_similarities:
+                if similarity <= threshold:
+                    self.result_list.append(1)  # Compute this block
+                else:
+                    self.result_list.append(0)  # Skip this block
+        
+        return hidden_states
 
     def img_patch_embed_and_refine(
         self,
@@ -557,7 +661,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         return_dict: bool = False,
     ) -> Union[torch.Tensor, Transformer2DModelOutput]:
         enable_taylorseer = getattr(self, 'enable_taylorseer', False)
-        if enable_taylorseer:
+        enable_sortblock = getattr(self, 'enable_sortblock', False)
+        if enable_taylorseer or enable_sortblock:
             cal_type(self.cache_dic, self.current)
         
         if attention_kwargs is not None:
@@ -675,6 +780,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                     else:
                         hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
                 self.teacache_params.previous_residual = hidden_states - ori_hidden_states
+        elif self.enable_sortblock:
+            hidden_states = self._sortblock_forward(hidden_states, attention_mask, rotary_emb, temb, timestep)
         else:
             if enable_taylorseer:
                 self.current['stream'] = 'layers_stream'
@@ -708,7 +815,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
             # remove `lora_scale` from each PEFT layer
             unscale_lora_layers(self, lora_scale)
             
-        if enable_taylorseer:
+        if enable_taylorseer or self.enable_sortblock:
             self.current['step'] += 1
 
         if not return_dict:
