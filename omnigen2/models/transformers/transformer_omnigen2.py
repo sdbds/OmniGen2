@@ -393,6 +393,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         self.rescale_func = np.poly1d(coefficients)
 
         # SortBlock settings (enable_sortblock will be set from pipeline)
+        self.enable_sortblock = False  # Default value, will be overridden by pipeline
         self.start = 950  # timestep range start
         self.end = 50     # timestep range end
         self.step_Num = 1

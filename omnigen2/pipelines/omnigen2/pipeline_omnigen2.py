@@ -643,7 +643,11 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
             model_pred_cache_dic, model_pred_current = cache_init(self, num_inference_steps)
             model_pred_ref_cache_dic, model_pred_ref_current = cache_init(self, num_inference_steps)
             model_pred_uncond_cache_dic, model_pred_uncond_current = cache_init(self, num_inference_steps)
-            self.transformer.enable_taylorseer = True
+            # Set the appropriate caching method on transformer
+            if enable_taylorseer:
+                self.transformer.enable_taylorseer = True
+            elif enable_sortblock:
+                self.transformer.enable_sortblock = True
         elif self.transformer.enable_teacache:
             # Use different TeaCacheParams for different conditions
             teacache_params = TeaCacheParams()
