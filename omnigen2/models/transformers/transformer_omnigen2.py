@@ -706,6 +706,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                     self.count = 0
                     self.precentage = 1
                     self.result_list = []
+                    cache_init(cache_dic=self.cache_dic, current=self.current)
+                    taylor_cache_init(cache_dic=self.cache_dic, current=self.current)
                     self.sortblock_initialized = True
                 
                 self.count += 1
