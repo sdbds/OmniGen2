@@ -97,26 +97,28 @@ def run(
         )
 
     # Apply caching settings
-    print(f"🔍 CACHE DEBUG: enable_sortblock={enable_sortblock}, enable_taylorseer={enable_taylorseer}")
-    print(f"🔍 CACHE DEBUG: pipeline id = {id(pipeline)}, transformer id = {id(pipeline.transformer)}")
+    
+    # 先关闭所有缓存方法，确保互斥
+    pipeline.enable_sortblock = False
+    pipeline.enable_taylorseer = False
+    pipeline.transformer.enable_sortblock = False
+    pipeline.transformer.enable_taylorseer = False
+    pipeline.transformer.enable_magcache = False
     
     if enable_sortblock:
-        print("WARNING: enable_taylorseer and enable_sortblock are mutually exclusive. enable_sortblock will be used.")
+        print("✅ SortBlock enabled")
         pipeline.enable_sortblock = True
         pipeline.transformer.enable_sortblock = True
-        print(f"✅ CACHE SET: pipeline.enable_sortblock = {getattr(pipeline, 'enable_sortblock', 'NOT_SET')}")
-        print(f"✅ CACHE SET: pipeline.transformer.enable_sortblock = {getattr(pipeline.transformer, 'enable_sortblock', 'NOT_SET')}")
     elif enable_taylorseer:
+        print("✅ TaylorSeer enabled")
         pipeline.enable_taylorseer = True
         pipeline.transformer.enable_taylorseer = True
-        print(f"✅ CACHE SET: pipeline.enable_taylorseer = {getattr(pipeline, 'enable_taylorseer', 'NOT_SET')}")
-        print(f"✅ CACHE SET: pipeline.transformer.enable_taylorseer = {getattr(pipeline.transformer, 'enable_taylorseer', 'NOT_SET')}")
     elif enable_magcache:
+        print("✅ MagCache enabled")
         pipeline.transformer.enable_magcache = True
         pipeline.transformer.magcache_thresh = magcache_thresh
-        print(f"✅ CACHE SET: pipeline.transformer.enable_magcache = {getattr(pipeline.transformer, 'enable_magcache', 'NOT_SET')}")
     else:
-        print("❌ NO CACHE: No caching mechanism enabled")
+        print("❌ No caching enabled")
 
     results = pipeline(
         prompt=instruction,
