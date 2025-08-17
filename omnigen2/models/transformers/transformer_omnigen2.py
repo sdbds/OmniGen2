@@ -403,9 +403,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         self.precentage = 1
         
         # SortBlock state tracking
-        self.current_block_residual = {}
-        self.previous_block_residual = {}
-        self.result_list = []
+        self.previous_block_residual = {}  # Store previous residuals for comparison
+        self.result_list = []  # Dynamic block selection results
 
     def initialize_weights(self) -> None:
         """
@@ -430,10 +429,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         """
         SortBlock forward implementation based on TaylorSeer dynamic block selection.
         """
-        # Initialize state on first timestep
+        # Initialize state on first timestep  
         if timestep == 1000:
-            self.current_block_residual = [None] * len(self.layers)
-            self.previous_block_residual = [None] * len(self.layers)
             self.count = 0
             self.precentage = 1
             self.result_list = []
@@ -463,18 +460,19 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 else:
                     hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
                 
-                # Store residuals for comparison
+                # Store residuals using existing cache mechanism
                 if self.count % current_step_num == 0:
+                    self.current['layer'] = layer_idx
+                    self.current['module'] = 'total'
+                    taylor_cache_init(cache_dic=self.cache_dic, current=self.current)
+                    derivative_approximation(cache_dic=self.cache_dic, current=self.current, feature=hidden_states.clone() - ori_hidden_states)
                     self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
             else:
                 # Use Taylor approximation for skipped blocks
-                if self.count % current_step_num == 1:
-                    if layer_idx not in self.current_block_residual:
-                        self.current_block_residual[layer_idx] = torch.zeros_like(hidden_states)
-                
-                # Apply stored residual
-                if layer_idx in self.current_block_residual:
-                    hidden_states += self.current_block_residual[layer_idx]
+                self.current['layer'] = layer_idx
+                self.current['module'] = 'total'
+                taylor_approximation = taylor_formula(cache_dic=self.cache_dic, current=self.current)
+                hidden_states += taylor_approximation
 
         # Compute cosine similarities and update result_list
         if self.count % current_step_num == 1 and len(self.previous_block_residual) > 0:
@@ -485,11 +483,17 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
             
             cosine_similarities = []
             for i in range(len(self.layers)):
-                if (self.previous_block_residual[i] is not None and 
-                    self.current_block_residual[i] is not None):
+                if i in self.previous_block_residual:
                     # Compute cosine similarity on a subset of features for efficiency
-                    prev_subset = self.previous_block_residual[i][:, :, :self.previous_block_residual[i].shape[-1] // 8].float()
-                    curr_subset = self.current_block_residual[i][:, :, :self.current_block_residual[i].shape[-1] // 8].float()
+                    prev_residual = self.previous_block_residual[i]
+                    
+                    # Get current Taylor approximation for comparison
+                    self.current['layer'] = i
+                    self.current['module'] = 'total'
+                    curr_residual = taylor_formula(cache_dic=self.cache_dic, current=self.current)
+                    
+                    prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 8].float()
+                    curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 8].float()
                     
                     cosine_similarity = torch.nn.functional.cosine_similarity(
                         prev_subset, curr_subset, dim=-1
