@@ -701,7 +701,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
             if enable_sortblock:
                 # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）
                 timestep_val = timestep.item() if hasattr(timestep, 'item') else timestep
-                if not hasattr(self, 'sortblock_initialized') or timestep_val > 0.9:
+                if not hasattr(self, 'sortblock_initialized'):
                     print(f"🔧 SortBlock initializing at timestep {timestep_val}")
                     self.count = 0
                     self.precentage = 1

@@ -148,6 +148,46 @@ class Transport:
                 elif self.time_shift_version == "v2":
                     tokens = th.tensor([(_x1.shape[-2] // 2) * (_x1.shape[-1] // 2) for _x1 in x1], dtype=t.dtype, device=t.device).view_as(t)
                     t = self.time_shift_v2(tokens, t)
+                elif self.time_shift_version == "v3":
+                    # Qinglong triple hybrid sampling: mid_shift:logsnr:logsnr2 = 79%:11%:10%
+                    batch_size = len(x1)
+                    decision_t = th.rand((batch_size,), device=t.device)
+                    
+                    # Create masks for different sampling methods
+                    mid_mask = decision_t < 0.79  # 79% for mid_shift
+                    logsnr_mask = (decision_t >= 0.79) & (decision_t < 0.9)  # 11% for logsnr
+                    logsnr2_mask = decision_t >= 0.9  # 10% for logsnr2
+                    
+                    # Initialize output tensor with same shape as original t
+                    t_hybrid = th.zeros_like(t)
+                    
+                    # Generate mid_shift samples (79%)
+                    if mid_mask.any():
+                        mid_count = mid_mask.sum().item()
+                        tokens = th.tensor([(_x1.shape[-2] // 2) * (_x1.shape[-1] // 2) for _x1 in x1], dtype=t.dtype, device=t.device)
+                        mu = self.get_lin_function(y1=0.5, y2=1.15)(tokens[mid_mask].float())
+                        shift = th.exp(mu)
+                        logits_norm_mid = th.randn(mid_count, device=t.device)
+                        logits_norm_mid = logits_norm_mid * 1.0  # sigmoid_scale
+                        t_mid = logits_norm_mid.sigmoid()
+                        t_mid = (t_mid * shift) / (1 + (shift - 1) * t_mid)
+                        t_hybrid[mid_mask] = t_mid
+                    
+                    # Generate logsnr samples (11%)  
+                    if logsnr_mask.any():
+                        logsnr_count = logsnr_mask.sum().item()
+                        logsnr = th.normal(mean=-6, std=2.0, size=(logsnr_count,), device=t.device)
+                        t_logsnr = th.sigmoid(-logsnr / 2)
+                        t_hybrid[logsnr_mask] = t_logsnr
+                    
+                    # Generate logsnr2 samples (10%)
+                    if logsnr2_mask.any():
+                        logsnr2_count = logsnr2_mask.sum().item()
+                        logsnr2 = th.normal(mean=5.36, std=1.0, size=(logsnr2_count,), device=t.device)
+                        t_logsnr2 = th.sigmoid(-logsnr2 / 2)
+                        t_hybrid[logsnr2_mask] = t_logsnr2
+                    
+                    t = t_hybrid
             else:
                 if self.time_shift_version == "v1":
                     base_shift: float = 0.5
