@@ -50,6 +50,6 @@ $FinalArgs = $AppArgs -join " "
 #endregion
 
 Write-Output "Running: python app.py $FinalArgs"
-Invoke-Expression "python app.py $FinalArgs"
+Invoke-Expression "python -m accelerate.commands.launch 'app.py' $FinalArgs"
 
 Read-Host | Out-Null ;
