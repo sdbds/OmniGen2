@@ -694,7 +694,10 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                         hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
                 self.teacache_params.previous_residual = hidden_states - ori_hidden_states
         else:
-            # SortBlock initialization - 修复：适配小数timestep，使用pipeline提供的cache
+            if enable_taylorseer or enable_sortblock:
+                self.current['stream'] = 'layers_stream'
+                
+            # SortBlock initialization - 修复：适配小数timestep，使用pipeline提供的cache  
             if enable_sortblock:
                 # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）
                 timestep_val = timestep.item() if hasattr(timestep, 'item') else timestep
@@ -703,13 +706,6 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                     self.count = 0
                     self.precentage = 1
                     self.result_list = []
-                    # 确保cache已被pipeline设置
-                    if hasattr(self, 'current') and hasattr(self, 'cache_dic'):
-                        self.current['stream'] = 'layers_stream'
-                        taylor_cache_init(cache_dic=self.cache_dic, current=self.current)
-                        print("✅ SortBlock cache initialized successfully")
-                    else:
-                        print("❌ Warning: cache_dic/current not set by pipeline")
                     self.sortblock_initialized = True
                 
                 self.count += 1
@@ -717,9 +713,6 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 # Determine step number based on timestep range
                 is_within_block_range = self.end <= timestep <= self.start
                 current_step_num = self.step_Num2 if is_within_block_range else self.step_Num
-
-            if enable_taylorseer or enable_sortblock:
-                self.current['stream'] = 'layers_stream'
 
             for layer_idx, layer in enumerate(self.layers):
                 if enable_taylorseer or enable_sortblock:
