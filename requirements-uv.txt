@@ -4,6 +4,8 @@ accelerate==1.8.1
     # via
     #   -r requirements.txt
     #   peft
+aiofiles==24.1.0
+    # via gradio
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.12.13
@@ -14,18 +16,30 @@ annotated-types==0.7.0
     # via pydantic
 antlr4-python3-runtime==4.9.3
     # via omegaconf
+anyio==4.9.0
+    # via
+    #   gradio
+    #   httpx
+    #   starlette
 asttokens==3.0.0
     # via stack-data
 attrs==25.3.0
     # via aiohttp
+brotli==1.1.0
+    # via gradio
 certifi==2025.6.15
     # via
+    #   httpcore
+    #   httpx
     #   requests
     #   sentry-sdk
 charset-normalizer==3.4.2
     # via requests
 click==8.2.1
-    # via wandb
+    # via
+    #   typer
+    #   uvicorn
+    #   wandb
 comm==0.2.2
     # via ipykernel
 contourpy==1.3.2
@@ -50,6 +64,10 @@ einops==0.8.1
     #   flash-attn
 executing==2.2.0
     # via stack-data
+fastapi==0.116.1
+    # via gradio
+ffmpy==0.6.1
+    # via gradio
 filelock==3.18.0
     # via
     #   datasets
@@ -68,25 +86,47 @@ frozenlist==1.7.0
 fsspec==2025.3.0
     # via
     #   datasets
+    #   gradio-client
     #   huggingface-hub
     #   torch
 gitdb==4.0.12
     # via gitpython
 gitpython==3.1.44
     # via wandb
+gradio==5.38.2
+    # via -r requirements.txt
+gradio-client==1.11.0
+    # via gradio
+groovy==0.1.2
+    # via gradio
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
 hf-xet==1.1.5
     # via huggingface-hub
+httpcore==1.0.9
+    # via httpx
+httpx==0.28.1
+    # via
+    #   gradio
+    #   gradio-client
+    #   safehttpx
 huggingface-hub==0.33.2
     # via
     #   accelerate
     #   datasets
     #   diffusers
+    #   gradio
+    #   gradio-client
     #   peft
     #   timm
     #   tokenizers
     #   transformers
 idna==3.10
     # via
+    #   anyio
+    #   httpx
     #   requests
     #   yarl
 importlib-metadata==8.7.0
@@ -100,7 +140,9 @@ ipython-pygments-lexers==1.1.1
 jedi==0.19.2
     # via ipython
 jinja2==3.1.6
-    # via torch
+    # via
+    #   gradio
+    #   torch
 jupyter-client==8.6.3
     # via ipykernel
 jupyter-core==5.8.1
@@ -109,14 +151,20 @@ jupyter-core==5.8.1
     #   jupyter-client
 kiwisolver==1.4.8
     # via matplotlib
+markdown-it-py==3.0.0
+    # via rich
 markupsafe==3.0.2
-    # via jinja2
+    # via
+    #   gradio
+    #   jinja2
 matplotlib==3.10.3
     # via -r requirements.txt
 matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
+mdurl==0.1.2
+    # via markdown-it-py
 mpmath==1.3.0
     # via sympy
 multidict==6.6.3
@@ -137,6 +185,7 @@ numpy==2.3.1
     #   contourpy
     #   datasets
     #   diffusers
+    #   gradio
     #   matplotlib
     #   opencv-python-headless
     #   pandas
@@ -185,10 +234,14 @@ omegaconf==2.3.0
     # via -r requirements.txt
 opencv-python-headless==4.11.0.86
     # via -r requirements.txt
+orjson==3.11.1
+    # via gradio
 packaging==25.0
     # via
     #   accelerate
     #   datasets
+    #   gradio
+    #   gradio-client
     #   huggingface-hub
     #   ipykernel
     #   matplotlib
@@ -196,7 +249,9 @@ packaging==25.0
     #   transformers
     #   wandb
 pandas==2.3.0
-    # via datasets
+    # via
+    #   datasets
+    #   gradio
 parso==0.8.4
     # via jedi
 peft==0.15.2
@@ -207,6 +262,7 @@ pillow==11.3.0
     # via
     #   -r requirements.txt
     #   diffusers
+    #   gradio
     #   matplotlib
     #   torchvision
 platformdirs==4.3.8
@@ -233,13 +289,19 @@ pure-eval==0.2.3
 pyarrow==20.0.0
     # via datasets
 pydantic==2.11.7
-    # via wandb
+    # via
+    #   fastapi
+    #   gradio
+    #   wandb
 pydantic-core==2.33.2
     # via pydantic
+pydub==0.25.1
+    # via gradio
 pygments==2.19.2
     # via
     #   ipython
     #   ipython-pygments-lexers
+    #   rich
 pyparsing==3.2.3
     # via matplotlib
 python-dateutil==2.9.0.post0
@@ -249,12 +311,15 @@ python-dateutil==2.9.0.post0
     #   pandas
 python-dotenv==1.1.1
     # via -r requirements.txt
+python-multipart==0.0.20
+    # via gradio
 pytz==2025.2
     # via pandas
 pyyaml==6.0.2
     # via
     #   accelerate
     #   datasets
+    #   gradio
     #   huggingface-hub
     #   omegaconf
     #   peft
@@ -276,6 +341,12 @@ requests==2.32.4
     #   huggingface-hub
     #   transformers
     #   wandb
+rich==14.1.0
+    # via typer
+ruff==0.12.7
+    # via gradio
+safehttpx==0.1.6
+    # via gradio
 safetensors==0.5.3
     # via
     #   accelerate
@@ -287,22 +358,34 @@ scipy==1.16.0
     # via
     #   -r requirements.txt
     #   torchdiffeq
+semantic-version==2.10.0
+    # via gradio
 sentry-sdk==2.32.0
     # via wandb
 setuptools==80.9.0
     # via triton
+shellingham==1.5.4
+    # via typer
 six==1.17.0
     # via python-dateutil
 smmap==5.0.2
     # via gitdb
+sniffio==1.3.1
+    # via anyio
 stack-data==0.6.3
     # via ipython
+starlette==0.47.2
+    # via
+    #   fastapi
+    #   gradio
 sympy==1.14.0
     # via torch
 timm==1.0.16
     # via -r requirements.txt
 tokenizers==0.21.2
     # via transformers
+tomlkit==0.13.3
+    # via gradio
 torch==2.7.1
     # via
     #   -r requirements.txt
@@ -343,13 +426,21 @@ transformers==4.51.3
     #   peft
 triton==3.3.1
     # via torch
+typer==0.16.0
+    # via gradio
 typing-extensions==4.14.0
     # via
+    #   anyio
+    #   fastapi
+    #   gradio
+    #   gradio-client
     #   huggingface-hub
     #   ipython
     #   pydantic
     #   pydantic-core
+    #   starlette
     #   torch
+    #   typer
     #   typing-inspection
     #   wandb
 typing-inspection==0.4.1
@@ -360,10 +451,14 @@ urllib3==2.5.0
     # via
     #   requests
     #   sentry-sdk
+uvicorn==0.35.0
+    # via gradio
 wandb==0.21.0
     # via -r requirements.txt
 wcwidth==0.2.13
     # via prompt-toolkit
+websockets==15.0.1
+    # via gradio-client
 wheel==0.45.1
     # via -r requirements.txt
 xxhash==3.5.0
