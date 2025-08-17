@@ -65,6 +65,10 @@ def run(
     max_input_image_side_length,
     max_pixels,
     seed_input,
+    enable_sortblock,
+    enable_taylorseer,
+    enable_magcache,
+    magcache_thresh,
     progress=gr.Progress(),
 ):
     input_images = [image_input_1, image_input_2, image_input_3]
@@ -91,6 +95,16 @@ def run(
             solver_order=2,
             prediction_type="flow_prediction",
         )
+
+    # Apply caching settings
+    if enable_sortblock:
+        print("WARNING: enable_taylorseer and enable_sortblock are mutually exclusive. enable_sortblock will be used.")
+        pipeline.enable_sortblock = True
+    elif enable_taylorseer:
+        pipeline.enable_taylorseer = True
+    elif enable_magcache:
+        pipeline.transformer.enable_magcache = True
+        pipeline.transformer.magcache_thresh = magcache_thresh
 
     results = pipeline(
         prompt=instruction,
@@ -1060,6 +1074,20 @@ def main(args):
                     output_image = gr.Image(label="Output Image")
                     global save_images
                     save_images = gr.Checkbox(label="Save generated images", value=False)
+                    
+                    # Caching options
+                    with gr.Row(equal_height=True):
+                        enable_sortblock = gr.Checkbox(label="Enable SortBlock Caching", value=True)
+                        enable_taylorseer = gr.Checkbox(label="Enable TaylorSeer Caching", value=False)
+                    with gr.Row(equal_height=True):
+                        enable_magcache = gr.Checkbox(label="Enable MagCache", value=False)
+                        magcache_thresh = gr.Slider(
+                            label="MagCache Threshold",
+                            minimum=0.01,
+                            maximum=0.2,
+                            value=0.05,
+                            step=0.01,
+                        )
 
         global accelerator
         global pipeline
@@ -1091,6 +1119,10 @@ def main(args):
                 max_input_image_side_length,
                 max_pixels,
                 seed_input,
+                enable_sortblock,
+                enable_taylorseer,
+                enable_magcache,
+                magcache_thresh,
             ],
             outputs=output_image,
         )
