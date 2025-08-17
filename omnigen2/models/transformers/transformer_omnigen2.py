@@ -710,9 +710,21 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 
                 self.count += 1
                 
-                # Determine step number based on timestep range
-                is_within_block_range = self.end <= timestep <= self.start
+                # Determine step number based on timestep range - 兼容两种范围
+                timestep_val = timestep.item() if hasattr(timestep, 'item') else timestep
+                
+                # 自动检测timestep范围：>= 1为1000-based，< 1为0-1 based
+                if timestep_val >= 1:
+                    # 脚本模式：1000~0 range
+                    is_within_block_range = self.end <= timestep_val <= self.start
+                else:
+                    # Gradio模式：0~1 range，需要转换判断
+                    normalized_start = self.start / 1000  # 950/1000 = 0.95
+                    normalized_end = self.end / 1000      # 50/1000 = 0.05
+                    is_within_block_range = normalized_end <= timestep_val <= normalized_start
+                
                 current_step_num = self.step_Num2 if is_within_block_range else self.step_Num
+                print(f"🔍 Timestep={timestep_val}, range_check={is_within_block_range}, step_num={current_step_num}")
 
             for layer_idx, layer in enumerate(self.layers):
                 if enable_taylorseer or enable_sortblock:
@@ -730,6 +742,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                             self.result_list != [] and layer_idx < len(self.result_list) and self.result_list[layer_idx] == 1
                         )
                         self.current['type'] = 'full' if should_compute_block else 'Taylor'
+                        print(f"📋 Layer {layer_idx}: {'FULL' if should_compute_block else 'TAYLOR'} (count={self.count}, step_num={current_step_num})")
 
                 if torch.is_grad_enabled() and self.gradient_checkpointing:
                     hidden_states = self._gradient_checkpointing_func(
