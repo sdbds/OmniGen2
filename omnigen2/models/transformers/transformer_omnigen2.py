@@ -699,32 +699,19 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 
             # SortBlock initialization - 修复：适配小数timestep，使用pipeline提供的cache  
             if enable_sortblock:
-                # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）
-                timestep_val = timestep.item() if hasattr(timestep, 'item') else timestep
-                if not hasattr(self, 'sortblock_initialized'):
-                    print(f"🔧 SortBlock initializing at timestep {timestep_val}")
+                # 关键修复：将0~1的timestep转换为0~1000范围
+                timestep = timestep.to(hidden_states.dtype) * 1000
+                # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）    
+                if timestep == 1000:
+                    self.previous_block_residual = {}
                     self.count = 0
                     self.precentage = 1
                     self.result_list = []
-                    cache_init(cache_dic=self.cache_dic, current=self.current)
-                    taylor_cache_init(cache_dic=self.cache_dic, current=self.current)
-                    self.sortblock_initialized = True
-                
+
                 self.count += 1
-                
-                # Determine step number based on timestep range - 兼容两种范围
-                # 自动检测timestep范围：>= 1为1000-based，< 1为0-1 based
-                if timestep_val >= 1:
-                    # 脚本模式：1000~0 range
-                    is_within_block_range = self.end <= timestep_val <= self.start
-                else:
-                    # Gradio模式：0~1 range，需要转换判断
-                    normalized_start = self.start / 1000  # 950/1000 = 0.95
-                    normalized_end = self.end / 1000      # 50/1000 = 0.05
-                    is_within_block_range = normalized_end <= timestep_val <= normalized_start
-                
+
+                is_within_block_range = self.end <= timestep <= self.start
                 current_step_num = self.step_Num2 if is_within_block_range else self.step_Num
-                print(f"🔍 Timestep={timestep_val}, range_check={is_within_block_range}, step_num={current_step_num}")
 
             for layer_idx, layer in enumerate(self.layers):
                 if enable_taylorseer or enable_sortblock:
