@@ -427,6 +427,15 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         
         nn.init.normal_(self.image_index_embedding, std=0.02)
 
+    def reset_cache_state(self):
+        """Resets the cache and state variables for SortBlock acceleration."""
+        # The cache is initialized as a list of Nones, where N is the number of layers.
+        self.previous_block_residual = [None] * len(self.layers)
+        self.current_block_residual = [None] * len(self.layers)
+        self.result_list = []
+        self.count = 0
+        self.precentage = 1.0  # Start with full computation
+
 
     def img_patch_embed_and_refine(
         self,
@@ -700,16 +709,11 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 
             # SortBlock initialization - 修复：适配小数timestep，使用pipeline提供的cache  
             if enable_sortblock:
-                # 关键修复：将0~1的timestep转换为0~1000范围
+                # Convert timestep from 0-1 range to 0-1000 range for SortBlock logic
                 timestep = timestep.to(hidden_states.dtype) * 1000
-                # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）    
+                # Initialize caches at the beginning of the generation process
                 if timestep == 1000:
-                    self.current_block_residual = {}
-                    self.previous_block_residual = {}
-                    self.previous_block_residual = {}
-                    self.count = 0
-                    self.precentage = 1
-                    self.result_list = []
+                    self.reset_cache_state()
 
                 self.count += 1
 
@@ -729,26 +733,26 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                         
                         # SortBlock dynamic selection logic
                         should_compute_block = self.count % current_step_num == 0 or (
-                            self.result_list != [] and layer_idx < len(self.result_list) and self.result_list[layer_idx] == 1
+                            self.result_list != [] and self.result_list[layer_idx] == 1
                         )
                         self.current['type'] = 'full' if should_compute_block else 'Taylor'
 
-                # 存储原始hidden_states用于计算残差
+                # Store original hidden_states for residual calculation
                 if enable_sortblock and self.current['type'] == 'full':
                     ori_hidden_states = hidden_states.clone()
                 
                 if torch.is_grad_enabled() and self.gradient_checkpointing:
-                    hidden_states = self._gradient_checkpointing_func(
-                        layer, hidden_states, attention_mask, rotary_emb, temb
+                    hidden_states = torch.utils.checkpoint.checkpoint(
+                        layer, hidden_states, attention_mask, rotary_emb, temb, use_reentrant=False
                     )
                 else:
                     hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
                 
-                # 存储full计算的残差用于后续比较
+                # Store residual from full computation for later comparison
                 if enable_sortblock and self.current['type'] == 'full' and self.count % current_step_num == 0:
                     self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
 
-            # SortBlock: 预计算并缓存Taylor近似结果
+            # SortBlock: Pre-calculate and cache Taylor approximation results
             if enable_sortblock and self.count % current_step_num == 1:
                 for i in range(len(self.layers)):
                     self.current['layer'] = i
@@ -764,35 +768,35 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 
                 cosine_similarities = []
                 for i in range(len(self.layers)):
-                    if i in self.previous_block_residual:
-                        # Compute cosine similarity on a subset of features for efficiency
+                    # Ensure both residuals are available for comparison
+                    if self.previous_block_residual[i] is not None and self.current_block_residual[i] is not None:
                         prev_residual = self.previous_block_residual[i]
-                        
-                        # Use cached Taylor approximation for comparison
                         curr_residual = self.current_block_residual[i]
-                        
-                        prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 16].float()
-                        curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 16].float()
-                        
-                        cosine_similarity = torch.nn.functional.cosine_similarity(
-                            prev_subset, curr_subset, dim=-1
-                        )
-                        cosine_similarities.append(cosine_similarity.mean().item())
+
+                        # Check for dimension mismatch before using stale cache.
+                        if prev_residual.shape == curr_residual.shape:
+                            # Compute cosine similarity on a subset of features for efficiency
+                            prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 8].float()
+                            curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 8].float()
+                            
+                            similarity = torch.nn.functional.cosine_similarity(
+                                prev_subset, curr_subset, dim=-1
+                            )
+                            cosine_similarities.append(similarity.mean().item())
+                        else:
+                            # Shape mismatch, cannot compute. Force re-computation.
+                            cosine_similarities.append(1.0)
                     else:
-                        cosine_similarities.append(1.0)  # Default high similarity
+                        # Data unavailable, force re-computation.
+                        cosine_similarities.append(1.0)
                 
                 # Sort and determine threshold
                 sorted_cos = sorted(cosine_similarities)
                 threshold_idx = int(len(self.layers) * self.precentage)
                 threshold = sorted_cos[min(threshold_idx, len(sorted_cos) - 1)]
                 
-                # Update result list
-                self.result_list = []
-                for similarity in cosine_similarities:
-                    if similarity <= threshold:
-                        self.result_list.append(1)  # Compute this block
-                    else:
-                        self.result_list.append(0)  # Skip this block
+                # Update result list for the next step
+                self.result_list = [1 if s <= threshold else 0 for s in cosine_similarities]
 
         # 4. Output norm & projection
         hidden_states = self.norm_out(hidden_states, temb)

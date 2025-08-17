@@ -494,6 +494,9 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
         verbose: bool = False,
         step_func=None,
     ):
+        # 1. Reset transformer cache state before new inference
+        if hasattr(self.transformer, 'reset_cache_state'):
+            self.transformer.reset_cache_state()
 
         height = height or self.default_sample_size * self.vae_scale_factor
         width = width or self.default_sample_size * self.vae_scale_factor
