@@ -711,8 +711,6 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 self.count += 1
                 
                 # Determine step number based on timestep range - 兼容两种范围
-                timestep_val = timestep.item() if hasattr(timestep, 'item') else timestep
-                
                 # 自动检测timestep范围：>= 1为1000-based，< 1为0-1 based
                 if timestep_val >= 1:
                     # 脚本模式：1000~0 range
@@ -742,7 +740,6 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                             self.result_list != [] and layer_idx < len(self.result_list) and self.result_list[layer_idx] == 1
                         )
                         self.current['type'] = 'full' if should_compute_block else 'Taylor'
-                        print(f"📋 Layer {layer_idx}: {'FULL' if should_compute_block else 'TAYLOR'} (count={self.count}, step_num={current_step_num})")
 
                 if torch.is_grad_enabled() and self.gradient_checkpointing:
                     hidden_states = self._gradient_checkpointing_func(
