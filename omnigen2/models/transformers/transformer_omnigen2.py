@@ -176,7 +176,7 @@ class OmniGen2TransformerBlock(nn.Module):
 
                     derivative_approximation(cache_dic=self.cache_dic, current=self.current, feature=hidden_states)
 
-                elif self.current['type'] == 'Taylor': 
+                elif self.current['type'] == 'Taylor':
                     self.current['module'] = 'total'
                     hidden_states = taylor_formula(cache_dic=self.cache_dic, current=self.current)
             else:
@@ -703,6 +703,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 timestep = timestep.to(hidden_states.dtype) * 1000
                 # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）    
                 if timestep == 1000:
+                    self.current_block_residual = {}
                     self.previous_block_residual = {}
                     self.count = 0
                     self.precentage = 1
@@ -711,7 +712,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                 self.count += 1
 
                 is_within_block_range = self.end <= timestep <= self.start
-                current_step_num = self.step_Num2 if is_within_block_range else self.step_Num
+                current_step_num = self.step_Num2 if is_within_block_range else 1
 
             for layer_idx, layer in enumerate(self.layers):
                 if enable_taylorseer or enable_sortblock:
@@ -730,12 +731,27 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                         )
                         self.current['type'] = 'full' if should_compute_block else 'Taylor'
 
+                # 存储原始hidden_states用于计算残差
+                if enable_sortblock and self.current['type'] == 'full':
+                    ori_hidden_states = hidden_states.clone()
+                
                 if torch.is_grad_enabled() and self.gradient_checkpointing:
                     hidden_states = self._gradient_checkpointing_func(
                         layer, hidden_states, attention_mask, rotary_emb, temb
                     )
                 else:
                     hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
+                
+                # 存储full计算的残差用于后续比较
+                if enable_sortblock and self.current['type'] == 'full' and self.count % current_step_num == 0:
+                    self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
+
+            # SortBlock: 预计算并缓存Taylor近似结果
+            if enable_sortblock and self.count % current_step_num == 1:
+                for i in range(len(self.layers)):
+                    self.current['layer'] = i
+                    self.current['module'] = 'total'
+                    self.current_block_residual[i] = taylor_formula(cache_dic=self.cache_dic, current=self.current)
 
             # SortBlock cosine similarity computation and dynamic selection
             if enable_sortblock and self.count % current_step_num == 1 and len(self.previous_block_residual) > 0:
@@ -750,10 +766,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                         # Compute cosine similarity on a subset of features for efficiency
                         prev_residual = self.previous_block_residual[i]
                         
-                        # Get current Taylor approximation for comparison
-                        self.current['layer'] = i
-                        self.current['module'] = 'total'
-                        curr_residual = taylor_formula(cache_dic=self.cache_dic, current=self.current)
+                        # Use cached Taylor approximation for comparison
+                        curr_residual = self.current_block_residual[i]
                         
                         prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 8].float()
                         curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 8].float()
