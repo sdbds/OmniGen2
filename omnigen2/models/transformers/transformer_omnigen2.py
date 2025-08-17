@@ -574,6 +574,7 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
     ) -> Union[torch.Tensor, Transformer2DModelOutput]:
         enable_taylorseer = getattr(self, 'enable_taylorseer', False)
         enable_sortblock = getattr(self, 'enable_sortblock', False)
+        print(f"🚀 TRANSFORMER FORWARD: enable_taylorseer={enable_taylorseer}, enable_sortblock={enable_sortblock}, timestep={timestep.item() if timestep.numel() == 1 else timestep}")
         if enable_taylorseer or enable_sortblock:
             cal_type(self.cache_dic, self.current)
         
