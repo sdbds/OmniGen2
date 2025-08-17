@@ -694,15 +694,19 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                         hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
                 self.teacache_params.previous_residual = hidden_states - ori_hidden_states
         else:
-            # SortBlock initialization
+            # SortBlock initialization - 修复：适配小数timestep
             if enable_sortblock:
-                if timestep == 1000:
+                # 初始化条件：第一次调用或timestep接近最大值（适配小数timestep）
+                timestep_val = timestep.item() if hasattr(timestep, 'item') else timestep
+                if not hasattr(self, 'sortblock_initialized') or timestep_val > 0.9:
+                    print(f"🔧 SortBlock initializing at timestep {timestep_val}")
                     self.count = 0
                     self.precentage = 1
                     self.result_list = []
                     self.current['stream'] = 'layers_stream'
                     cache_init(cache_dic=self.cache_dic, current=self.current)
                     taylor_cache_init(cache_dic=self.cache_dic, current=self.current)
+                    self.sortblock_initialized = True
                 
                 self.count += 1
                 
