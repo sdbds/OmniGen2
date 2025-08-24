@@ -478,7 +478,7 @@ class OmniGen2Pipeline(DiffusionPipeline, OmniGen2LoraLoaderMixin):
         num_images_per_prompt: int = 1,
         height: Optional[int] = None,
         width: Optional[int] = None,
-        max_pixels: int = 1024 * 1024,
+        max_pixels: int = 1328 * 1328,
         max_input_image_side_length: int = 1024,
         align_res: bool = True,
         num_inference_steps: int = 28,

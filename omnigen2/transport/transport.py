@@ -154,9 +154,8 @@ class Transport:
                     decision_t = th.rand((batch_size,), device=t.device)
                     
                     # Create masks for different sampling methods
-                    mid_mask = decision_t < 0.79  # 79% for mid_shift
-                    logsnr_mask = (decision_t >= 0.79) & (decision_t < 0.9)  # 11% for logsnr
-                    logsnr2_mask = decision_t >= 0.9  # 10% for logsnr2
+                    mid_mask = decision_t < 0.95  # 90% for mid_shift
+                    logsnr2_mask = decision_t >= 0.95  # 10% for logsnr2
                     
                     # Initialize output tensor with same shape as original t
                     t_hybrid = th.zeros_like(t)
@@ -165,20 +164,13 @@ class Transport:
                     if mid_mask.any():
                         mid_count = mid_mask.sum().item()
                         tokens = th.tensor([(_x1.shape[-2] // 2) * (_x1.shape[-1] // 2) for _x1 in x1], dtype=t.dtype, device=t.device)
-                        mu = self.get_lin_function(y1=0.5, y2=1.15)(tokens[mid_mask].float())
+                        mu = self.get_lin_function(x1=256, y1=0.5, x2=8192, y2=0.9)(tokens[mid_mask].float())
                         shift = th.exp(mu)
                         logits_norm_mid = th.randn(mid_count, device=t.device)
                         logits_norm_mid = logits_norm_mid * 1.0  # sigmoid_scale
                         t_mid = logits_norm_mid.sigmoid()
                         t_mid = (t_mid * shift) / (1 + (shift - 1) * t_mid)
                         t_hybrid[mid_mask] = t_mid
-                    
-                    # Generate logsnr samples (11%)  
-                    if logsnr_mask.any():
-                        logsnr_count = logsnr_mask.sum().item()
-                        logsnr = th.normal(mean=-6, std=2.0, size=(logsnr_count,), device=t.device)
-                        t_logsnr = th.sigmoid(-logsnr / 2)
-                        t_hybrid[logsnr_mask] = t_logsnr
                     
                     # Generate logsnr2 samples (10%)
                     if logsnr2_mask.any():
