@@ -406,6 +406,16 @@ def main(args):
             warmup_prefix=args.train.warmup_prefix,
             t_in_epochs=args.train.t_in_epochs,
         )
+    elif args.train.lr_scheduler == 'wsd':
+        from pytorch_optimizer.lr_scheduler import get_wsd_schedule
+
+        lr_scheduler = get_wsd_schedule(
+            optimizer=optimizer,
+            num_warmup_steps=args.train.warmup_t,
+            num_training_steps=args.train.max_train_steps,
+            num_decay_steps=args.train.max_train_steps * 0.1,
+            min_lr_ratio=0.1,
+        )
     else:
         lr_scheduler = get_scheduler(
             args.train.lr_scheduler,
