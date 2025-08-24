@@ -388,7 +388,7 @@ transformers==4.51.3
     # via
     #   -r requirements.txt
     #   peft
-triton-windows==3.3.1.post19
+triton-windows==3.4.0.post20
     # via -r requirements.txt
 typer==0.16.0
     # via gradio

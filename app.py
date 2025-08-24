@@ -65,7 +65,7 @@ def run(
     max_input_image_side_length,
     max_pixels,
     seed_input,
-    enable_sortblock,
+    enable_cgtaylor,
     enable_taylorseer,
     enable_magcache,
     magcache_thresh,
@@ -99,16 +99,16 @@ def run(
     # Apply caching settings
     
     # 先关闭所有缓存方法，确保互斥
-    pipeline.enable_sortblock = False
+    pipeline.enable_cgtaylor = False
     pipeline.enable_taylorseer = False
-    pipeline.transformer.enable_sortblock = False
+    pipeline.transformer.enable_cgtaylor = False
     pipeline.transformer.enable_taylorseer = False
     pipeline.transformer.enable_magcache = False
     
-    if enable_sortblock:
-        print("✅ SortBlock enabled")
-        pipeline.enable_sortblock = True
-        pipeline.transformer.enable_sortblock = True
+    if enable_cgtaylor:
+        print("✅ CGTaylor enabled")
+        pipeline.enable_cgtaylor = True
+        pipeline.transformer.enable_cgtaylor = True
     elif enable_taylorseer:
         print("✅ TaylorSeer enabled")
         pipeline.enable_taylorseer = True
@@ -1091,7 +1091,7 @@ def main(args):
                     
                     # Caching options
                     with gr.Row(equal_height=True):
-                        enable_sortblock = gr.Checkbox(label="Enable SortBlock Caching", value=True)
+                        enable_cgtaylor = gr.Checkbox(label="Enable CGTaylor Caching", value=True)
                         enable_taylorseer = gr.Checkbox(label="Enable TaylorSeer Caching", value=False)
                     with gr.Row(equal_height=True):
                         enable_magcache = gr.Checkbox(label="Enable MagCache", value=False)
@@ -1134,7 +1134,7 @@ def main(args):
                 max_input_image_side_length,
                 max_pixels,
                 seed_input,
-                enable_sortblock,
+                enable_cgtaylor,
                 enable_taylorseer,
                 enable_magcache,
                 magcache_thresh,

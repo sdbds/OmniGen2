@@ -169,9 +169,9 @@ def parse_args() -> argparse.Namespace:
         help="Enable TaylorSeer Caching."
     )
     parser.add_argument(
-        "--enable_sortblock",
+        "--enable_cgtaylor",
         action="store_true",
-        help="Enable SortBlock Caching."
+        help="Enable CGTaylor Caching."
     )
     parser.add_argument(
         "--enable_magcache",
@@ -210,13 +210,13 @@ def load_pipeline(args: argparse.Namespace, accelerator: Accelerator, weight_dty
         print(f"LoRA weights loaded from {args.transformer_lora_path}")
         pipeline.load_lora_weights(args.transformer_lora_path)
 
-    if args.enable_teacache and args.enable_taylorseer or args.enable_sortblock:
+    if args.enable_teacache and args.enable_taylorseer or args.enable_cgtaylor:
         print("WARNING: enable_teacache and enable_taylorseer are mutually exclusive. enable_teacache will be ignored.")
 
     if args.enable_taylorseer:
         pipeline.enable_taylorseer = True
-    elif args.enable_sortblock:
-        pipeline.enable_sortblock = True
+    elif args.enable_cgtaylor:
+        pipeline.enable_cgtaylor = True
     elif args.enable_teacache:
         pipeline.transformer.enable_teacache = True
         pipeline.transformer.teacache_rel_l1_thresh = args.teacache_rel_l1_thresh

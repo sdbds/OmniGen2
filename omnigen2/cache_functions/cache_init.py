@@ -9,6 +9,8 @@ def cache_init(self, num_steps: int):
     cache = {}
     cache_index = {}
     cache[-1]={}
+    cache["hidden"] = {}
+    cache["firstblock_hidden"] = {}
     cache_index[-1]={}
     cache_index['layer_index']={}
     cache[-1]['layers_stream']={}
@@ -24,13 +26,15 @@ def cache_init(self, num_steps: int):
     cache_dic['cache'] = cache
     cache_dic['fresh_ratio_schedule'] = 'ToCa' 
     cache_dic['fresh_ratio'] = 0.0
-    cache_dic['fresh_threshold'] = 3
+    cache_dic['fresh_threshold'] = 2
     cache_dic['soft_fresh_weight'] = 0.0
     cache_dic['taylor_cache'] = True
-    cache_dic['max_order'] = 4
-    cache_dic['first_enhance'] = 5
+    cache_dic['max_order'] = 1
+    cache_dic["firstblock_max_order"] = 1
+    cache_dic['first_enhance'] = 3
 
     current = {}
+    current["block_activated_steps"] = [0]
     current['activated_steps'] = [0]
     current['step'] = 0
     current['num_steps'] = num_steps

@@ -16,7 +16,7 @@ python-dotenv
 ninja
 ipykernel
 wheel
-triton-windows; sys_platform == "win32"
+triton-windows>=3.4.0; sys_platform == "win32"
 flash-attn; sys_platform == 'linux'
 https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl; sys_platform == 'win32'
 peft

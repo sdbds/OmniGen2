@@ -29,7 +29,15 @@ if is_triton_available():
 else:
     from torch.nn import RMSNorm
 
-from ...taylorseer_utils import derivative_approximation, taylor_formula, taylor_cache_init
+from ...taylorseer_utils import (
+    derivative_approximation,
+    taylor_formula,
+    taylor_cache_init,
+    firstblock_taylor_formula,
+    firstblock_derivative_approximation,
+    step_taylor_formula,
+    step_derivative_approximation
+)
 from ...cache_functions import cache_init, cal_type
 
 logger = logging.get_logger(__name__)
@@ -153,8 +161,7 @@ class OmniGen2TransformerBlock(nn.Module):
             torch.Tensor: Output hidden states after transformer block processing
         """
         enable_taylorseer = getattr(self, 'enable_taylorseer', False)
-        enable_sortblock = getattr(self, 'enable_sortblock', False)
-        if enable_taylorseer or enable_sortblock:
+        if enable_taylorseer:
             if self.modulation:
                 if temb is None:
                     raise ValueError("temb must be provided when modulation is enabled")
@@ -176,7 +183,7 @@ class OmniGen2TransformerBlock(nn.Module):
 
                     derivative_approximation(cache_dic=self.cache_dic, current=self.current, feature=hidden_states)
 
-                elif self.current['type'] == 'Taylor':
+                elif self.current['type'] == 'Taylor': 
                     self.current['module'] = 'total'
                     hidden_states = taylor_formula(cache_dic=self.cache_dic, current=self.current)
             else:
@@ -393,20 +400,16 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         coefficients = [-5.48259225, 11.48772289, -4.47407401, 2.47730926, -0.03316487]
         self.rescale_func = np.poly1d(coefficients)
 
-        # SortBlock settings (enable_sortblock will be set from pipeline)
-        self.enable_sortblock = False  # Default value, will be overridden by pipeline
-        self.start = 950  # timestep range start
-        self.end = 50     # timestep range end
-        self.step_Num = 1
-        self.step_Num2 = 5
-        self.beta = 0.1    # rescale factor
-        self.count = 0
-        self.precentage = 1
-        
-        # SortBlock state tracking
-        self.current_block_residual = {}  # Store current residuals for comparison
-        self.previous_block_residual = {}  # Store previous residuals for comparison
-        self.result_list = []  # Dynamic block selection results
+        # CGTaylor settings (used by pipeline when enable_cgtaylor is True)
+        self.cgtaylor_threshold = 0.03
+        self.cnt = 0
+        self.pre_firstblock_hidden_states = None
+        self.predict_loss = None
+        self.predict_hidden_states = None
+
+        # 初始化 cache_dic 和 current（CGTaylor 需要）
+        self.cache_dic = None
+        self.current = None
 
     def initialize_weights(self) -> None:
         """
@@ -426,16 +429,6 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         nn.init.zeros_(self.norm_out.linear_2.bias)
         
         nn.init.normal_(self.image_index_embedding, std=0.02)
-
-    def reset_cache_state(self):
-        """Resets the cache and state variables for SortBlock acceleration."""
-        # The cache is initialized as a list of Nones, where N is the number of layers.
-        self.previous_block_residual = [None] * len(self.layers)
-        self.current_block_residual = [None] * len(self.layers)
-        self.result_list = []
-        self.count = 0
-        self.precentage = 1.0  # Start with full computation
-
 
     def img_patch_embed_and_refine(
         self,
@@ -583,9 +576,8 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
         return_dict: bool = False,
     ) -> Union[torch.Tensor, Transformer2DModelOutput]:
         enable_taylorseer = getattr(self, 'enable_taylorseer', False)
-        enable_sortblock = getattr(self, 'enable_sortblock', False)
-        print(f"🚀 TRANSFORMER FORWARD: enable_taylorseer={enable_taylorseer}, enable_sortblock={enable_sortblock}, timestep={timestep.item() if timestep.numel() == 1 else timestep}")
-        if enable_taylorseer or enable_sortblock:
+        enable_cgtaylor = getattr(self, 'enable_cgtaylor', False)
+        if enable_taylorseer or enable_cgtaylor:
             cal_type(self.cache_dic, self.current)
         
         if attention_kwargs is not None:
@@ -703,100 +695,86 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
                     else:
                         hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
                 self.teacache_params.previous_residual = hidden_states - ori_hidden_states
-        else:
-            if enable_taylorseer or enable_sortblock:
-                self.current['stream'] = 'layers_stream'
+        elif enable_cgtaylor:
+            # 第一个块的 Taylor 预测和处理
+            pre_firstblock_hidden_states = firstblock_taylor_formula(cache_dic=self.cache_dic, current=self.current)
+
+            # 执行第一个 transformer block
+            if torch.is_grad_enabled() and self.gradient_checkpointing:
+                hidden_states = self._gradient_checkpointing_func(
+                    self.layers[0], hidden_states, attention_mask, rotary_emb, temb
+                )
+            else:
+                hidden_states = self.layers[0](hidden_states, attention_mask, rotary_emb, temb)
+            
+            # 计算预测损失
+            if self.cnt > 4:
+                self.predict_loss = (
+                    pre_firstblock_hidden_states - hidden_states
+                ).abs().mean() / hidden_states.abs().mean()
+                can_use_cache = self.predict_loss < self.cgtaylor_threshold
+                if can_use_cache is False:
+                    if "block_activated_steps" not in self.current:
+                        self.current["block_activated_steps"] = []
+                    self.current["block_activated_steps"].append(self.current["step"])
+                    firstblock_derivative_approximation(cache_dic=self.cache_dic, current=self.current, feature=hidden_states)
+
+            # 决定是否需要计算后续层
+            if self.cnt == 0 or self.cnt == self.num_steps - 1:
+                should_calc = True
+                self.pre_firstblock_hidden_states = None
+                self.predict_hidden_states = None
+                self.predict_loss = None
+            else:
+                if self.predict_loss is None:
+                    can_use_cache = False
+                else:
+                    can_use_cache = self.predict_loss < self.cgtaylor_threshold
+                should_calc = not can_use_cache
+
+            self.cnt += 1
+            if self.cnt == self.num_steps:
+                self.cnt = 0
+
+            # 处理后续层
+            if not should_calc:
+                # 使用 Taylor 预测
+                hidden_states = step_taylor_formula(cache_dic=self.cache_dic, current=self.current)
+            else:
+                # 执行完整计算
+                if "activated_steps" not in self.current:
+                    self.current["activated_steps"] = []
+                self.current["activated_steps"].append(self.current["step"])
                 
-            # SortBlock initialization - 修复：适配小数timestep，使用pipeline提供的cache  
-            if enable_sortblock:
-                # Convert timestep from 0-1 range to 0-1000 range for SortBlock logic
-                timestep = timestep.to(hidden_states.dtype) * 1000
-                # Initialize caches at the beginning of the generation process
-                if timestep == 1000:
-                    self.reset_cache_state()
-
-                self.count += 1
-
-                is_within_block_range = self.end <= timestep <= self.start
-                current_step_num = self.step_Num2 if is_within_block_range else 1
+                # 处理剩余的 transformer blocks（从第二个开始）
+                for layer_idx in range(1, len(self.layers)):
+                    layer = self.layers[layer_idx]
+                    if torch.is_grad_enabled() and self.gradient_checkpointing:
+                        hidden_states = self._gradient_checkpointing_func(
+                            layer, hidden_states, attention_mask, rotary_emb, temb
+                        )
+                    else:
+                        hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
+                
+                # 计算导数近似
+                step_derivative_approximation(cache_dic=self.cache_dic, current=self.current, feature=hidden_states)
+        else:
+            if enable_taylorseer or enable_cgtaylor:
+                self.current['stream'] = 'layers_stream'
 
             for layer_idx, layer in enumerate(self.layers):
-                if enable_taylorseer or enable_sortblock:
+                if enable_taylorseer:
                     layer.current = self.current
                     layer.cache_dic = self.cache_dic
+                    layer.enable_taylorseer = True
                     self.current['layer'] = layer_idx
-                    
-                    if enable_taylorseer:
-                        layer.enable_taylorseer = True
-                    if enable_sortblock:
-                        layer.enable_sortblock = True
-                        
-                        # SortBlock dynamic selection logic
-                        should_compute_block = self.count % current_step_num == 0 or (
-                            self.result_list != [] and self.result_list[layer_idx] == 1
-                        )
-                        self.current['type'] = 'full' if should_compute_block else 'Taylor'
 
-                # Store original hidden_states for residual calculation
-                if enable_sortblock and self.current['type'] == 'full':
-                    ori_hidden_states = hidden_states.clone()
-                
                 if torch.is_grad_enabled() and self.gradient_checkpointing:
-                    hidden_states = torch.utils.checkpoint.checkpoint(
-                        layer, hidden_states, attention_mask, rotary_emb, temb, use_reentrant=False
+                    hidden_states = self._gradient_checkpointing_func(
+                        layer, hidden_states, attention_mask, rotary_emb, temb
                     )
                 else:
                     hidden_states = layer(hidden_states, attention_mask, rotary_emb, temb)
-                
-                # Store residual from full computation for later comparison
-                if enable_sortblock and self.current['type'] == 'full' and self.count % current_step_num == 0:
-                    self.previous_block_residual[layer_idx] = hidden_states.clone() - ori_hidden_states
-
-            # SortBlock: Pre-calculate and cache Taylor approximation results
-            if enable_sortblock and self.count % current_step_num == 1:
-                for i in range(len(self.layers)):
-                    self.current['layer'] = i
-                    self.current['module'] = 'total'
-                    self.current_block_residual[i] = taylor_formula(cache_dic=self.cache_dic, current=self.current)
-
-            # SortBlock cosine similarity computation and dynamic selection
-            if enable_sortblock and self.count % current_step_num == 1 and len(self.previous_block_residual) > 0:
-                # Rescale factor based on timestep
-                coefficients = [5.67621e-14, -1.36659e-10, 1.16246e-7, -3.97725e-5, 0.00361, 0.56088]
-                rescale_func = np.poly1d(coefficients)
-                self.precentage = rescale_func(timestep.item()) * self.beta
-                
-                cosine_similarities = []
-                for i in range(len(self.layers)):
-                    # Ensure both residuals are available for comparison
-                    if self.previous_block_residual[i] is not None and self.current_block_residual[i] is not None:
-                        prev_residual = self.previous_block_residual[i]
-                        curr_residual = self.current_block_residual[i]
-
-                        # Check for dimension mismatch before using stale cache.
-                        if prev_residual.shape == curr_residual.shape:
-                            # Compute cosine similarity on a subset of features for efficiency
-                            prev_subset = prev_residual[:, :, :prev_residual.shape[-1] // 8].float()
-                            curr_subset = curr_residual[:, :, :curr_residual.shape[-1] // 8].float()
-                            
-                            similarity = torch.nn.functional.cosine_similarity(
-                                prev_subset, curr_subset, dim=-1
-                            )
-                            cosine_similarities.append(similarity.mean().item())
-                        else:
-                            # Shape mismatch, cannot compute. Force re-computation.
-                            cosine_similarities.append(1.0)
-                    else:
-                        # Data unavailable, force re-computation.
-                        cosine_similarities.append(1.0)
-                
-                # Sort and determine threshold
-                sorted_cos = sorted(cosine_similarities)
-                threshold_idx = int(len(self.layers) * self.precentage)
-                threshold = sorted_cos[min(threshold_idx, len(sorted_cos) - 1)]
-                
-                # Update result list for the next step
-                self.result_list = [1 if s <= threshold else 0 for s in cosine_similarities]
 
         # 4. Output norm & projection
         hidden_states = self.norm_out(hidden_states, temb)
@@ -813,8 +791,12 @@ class OmniGen2Transformer2DModel(ModelMixin, ConfigMixin, PeftAdapterMixin, From
             # remove `lora_scale` from each PEFT layer
             unscale_lora_layers(self, lora_scale)
             
-        if enable_taylorseer or self.enable_sortblock:
+        if enable_taylorseer or enable_cgtaylor:
             self.current['step'] += 1
+
+        if enable_cgtaylor:
+            if attention_kwargs is not None:
+                attention_kwargs["current"] = self.current
 
         if not return_dict:
             return output
